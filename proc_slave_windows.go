@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package overseer
@@ -12,9 +13,7 @@ import (
 	"github.com/StackExchange/wmi"
 )
 
-var (
-	Timeout = 3 * time.Second
-)
+var Timeout = 3 * time.Second
 
 type Win32_Process struct {
 	Name                  string
@@ -63,9 +62,9 @@ func (sp *slave) watchParent() error {
 	}
 	sp.masterProc = proc
 	go func() {
-		//send signal 0 to master process forever
+		// send signal 0 to master process forever
 		for {
-			//should not error as long as the process is alive
+			// should not error as long as the process is alive
 			if _, err := GetWin32Proc(int32(sp.masterPid)); err != nil {
 				os.Exit(1)
 			}
@@ -115,7 +114,7 @@ func WMIQueryWithContext(ctx context.Context, query string, dst interface{}, con
 	}
 }
 
-// overwrite: see https://github.com/jpillora/overseer/issues/56#issuecomment-656405955
+// overwrite: see https://github.com/HyetPang/overseer/issues/56#issuecomment-656405955
 func overwrite(dst, src string) error {
 	old := strings.TrimSuffix(dst, ".exe") + "-old.exe"
 	if err := move(old, dst); err != nil {
