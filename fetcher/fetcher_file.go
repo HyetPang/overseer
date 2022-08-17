@@ -36,7 +36,7 @@ func (f *File) Init() error {
 
 // Fetch file from the specified Path
 func (f *File) Fetch() (io.Reader, error) {
-	//only delay after first fetch
+	// only delay after first fetch
 	if f.delay {
 		time.Sleep(f.Interval)
 	}
@@ -54,8 +54,8 @@ func (f *File) Fetch() (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	//check every 1/4s for 5s to
-	//ensure its not mid-copy
+	// check every 1/4s for 5s to
+	// ensure its not mid-copy
 	const rate = 250 * time.Millisecond
 	const total = int(5 * time.Second / rate)
 	attempt := 1
@@ -65,14 +65,14 @@ func (f *File) Fetch() (io.Reader, error) {
 			return nil, errors.New("file is currently being changed")
 		}
 		attempt++
-		//sleep
+		// sleep
 		time.Sleep(rate)
-		//check hash!
+		// check hash!
 		if err := f.updateHash(); err != nil {
 			file.Close()
 			return nil, err
 		}
-		//check until no longer changing
+		// check until no longer changing
 		if lastHash == f.hash {
 			break
 		}
@@ -84,7 +84,7 @@ func (f *File) Fetch() (io.Reader, error) {
 func (f *File) updateHash() error {
 	file, err := os.Open(f.Path)
 	if err != nil {
-		//binary does not exist, skip
+		// binary does not exist, skip
 		if os.IsNotExist(err) {
 			return nil
 		}
@@ -97,4 +97,8 @@ func (f *File) updateHash() error {
 	}
 	f.hash = fmt.Sprintf("%d|%d", s.ModTime().UnixNano(), s.Size())
 	return nil
+}
+
+func (f *File) FetchPath() string {
+	return f.Path
 }

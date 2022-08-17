@@ -22,7 +22,7 @@ import (
 
 var tmpBinPath = filepath.Join(os.TempDir(), "overseer-"+token()+extension())
 
-//a overseer master process
+// a overseer master process
 type master struct {
 	*Config
 	slaveID             int
@@ -65,30 +65,30 @@ func (mp *master) run() error {
 }
 
 func (mp *master) checkBinary() error {
-	//get path to binary and confirm its writable
-	binPath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to find binary path (%s)", err)
-	}
-	mp.binPath = binPath
-	if info, err := os.Stat(binPath); err != nil {
+	// get path to binary and confirm its writable
+	// binPath, err := os.Executable()
+	// if err != nil {
+	// 	return fmt.Errorf("failed to find binary path (%s)", err)
+	// }
+	mp.binPath = mp.Config.Fetcher.FetchPath()
+	if info, err := os.Stat(mp.binPath); err != nil {
 		return fmt.Errorf("failed to stat binary (%s)", err)
 	} else if info.Size() == 0 {
 		return fmt.Errorf("binary file is empty")
 	} else {
-		//copy permissions
+		// copy permissions
 		mp.binPerms = info.Mode()
 	}
-	f, err := os.Open(binPath)
+	f, err := os.Open(mp.binPath)
 	if err != nil {
 		return fmt.Errorf("cannot read binary (%s)", err)
 	}
-	//initial hash of file
+	// initial hash of file
 	hash := sha1.New()
 	io.Copy(hash, f)
 	mp.binHash = hash.Sum(nil)
 	f.Close()
-	//test bin<->tmpbin moves
+	// test bin<->tmpbin moves
 	if mp.Config.Fetcher != nil {
 		if err := move(tmpBinPath, mp.binPath); err != nil {
 			return fmt.Errorf("cannot move binary (%s)", err)
@@ -101,10 +101,10 @@ func (mp *master) checkBinary() error {
 }
 
 func (mp *master) setupSignalling() {
-	//updater-forker comms
+	// updater-forker comms
 	mp.restarted = make(chan bool)
 	mp.descriptorsReleased = make(chan bool)
-	//read all master process signals
+	// read all master process signals
 	signals := make(chan os.Signal)
 	signal.Notify(signals)
 	go func() {
@@ -116,7 +116,7 @@ func (mp *master) setupSignalling() {
 
 func (mp *master) handleSignal(s os.Signal) {
 	if s == mp.RestartSignal {
-		//user initiated manual restart
+		// user initiated manual restart
 		go mp.triggerRestart()
 	} else if s.String() == "child exited" {
 		// will occur on every restart, ignore it
@@ -129,13 +129,13 @@ func (mp *master) handleSignal(s os.Signal) {
 		mp.awaitingUSR1 = false
 		mp.descriptorsReleased <- true
 	} else
-	//while the slave process is running, proxy
-	//all signals through
+	// while the slave process is running, proxy
+	// all signals through
 	if mp.slaveCmd != nil && mp.slaveCmd.Process != nil {
 		mp.debugf("proxy signal (%s)", s)
 		mp.sendSignal(s)
 	} else
-	//otherwise if not running, kill on CTRL+c
+	// otherwise if not running, kill on CTRL+c
 	if s == os.Interrupt {
 		mp.debugf("interupt with no slave")
 		os.Exit(1)
@@ -176,19 +176,19 @@ func (mp *master) retreiveFileDescriptors() error {
 	return nil
 }
 
-//fetchLoop is run in a goroutine
+// fetchLoop is run in a goroutine
 func (mp *master) fetchLoop() {
 	min := mp.Config.MinFetchInterval
 	time.Sleep(min)
 	for {
 		t0 := time.Now()
 		mp.fetch()
-		//duration fetch of fetch
+		// duration fetch of fetch
 		diff := time.Now().Sub(t0)
 		if diff < min {
 			delay := min - diff
-			//ensures at least MinFetchInterval delay.
-			//should be throttled by the fetcher!
+			// ensures at least MinFetchInterval delay.
+			// should be throttled by the fetcher!
 			time.Sleep(delay)
 		}
 	}
@@ -196,7 +196,7 @@ func (mp *master) fetchLoop() {
 
 func (mp *master) fetch() {
 	if mp.restarting {
-		return //skip if restarting
+		return // skip if restarting
 	}
 	if mp.printCheckUpdate {
 		mp.debugf("checking for updates...")
@@ -211,15 +211,15 @@ func (mp *master) fetch() {
 			mp.debugf("no updates")
 		}
 		mp.printCheckUpdate = false
-		return //fetcher has explicitly said there are no updates
+		return // fetcher has explicitly said there are no updates
 	}
 	mp.printCheckUpdate = true
 	mp.debugf("streaming update...")
-	//optional closer
+	// optional closer
 	if closer, ok := reader.(io.Closer); ok {
 		defer closer.Close()
 	}
-	tmpBin, err := os.OpenFile(tmpBinPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	tmpBin, err := os.OpenFile(tmpBinPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o666)
 	if err != nil {
 		mp.warnf("failed to open temp binary: %s", err)
 		return
@@ -228,22 +228,22 @@ func (mp *master) fetch() {
 		tmpBin.Close()
 		os.Remove(tmpBinPath)
 	}()
-	//tee off to sha1
+	// tee off to sha1
 	hash := sha1.New()
 	reader = io.TeeReader(reader, hash)
-	//write to a temp file
+	// write to a temp file
 	_, err = io.Copy(tmpBin, reader)
 	if err != nil {
 		mp.warnf("failed to write temp binary: %s", err)
 		return
 	}
-	//compare hash
+	// compare hash
 	newHash := hash.Sum(nil)
 	if bytes.Equal(mp.binHash, newHash) {
 		mp.debugf("hash match - skip")
 		return
 	}
-	//copy permissions
+	// copy permissions
 	if err := chmod(tmpBin, mp.binPerms); err != nil {
 		mp.warnf("failed to make temp binary executable: %s", err)
 		return
@@ -267,7 +267,7 @@ func (mp *master) fetch() {
 			return
 		}
 	}
-	//overseer sanity check, dont replace our good binary with a non-executable file
+	// overseer sanity check, dont replace our good binary with a non-executable file
 	tokenIn := token()
 	cmd := exec.Command(tmpBinPath)
 	cmd.Env = append(os.Environ(), []string{envBinCheck + "=" + tokenIn}...)
@@ -292,48 +292,48 @@ func (mp *master) fetch() {
 		mp.warnf("sanity check failed")
 		return
 	}
-	//overwrite!
+	// overwrite!
 	if err := overwrite(mp.binPath, tmpBinPath); err != nil {
 		mp.warnf("failed to overwrite binary: %s", err)
 		return
 	}
 	mp.debugf("upgraded binary (%x -> %x)", mp.binHash[:12], newHash[:12])
 	mp.binHash = newHash
-	//binary successfully replaced
+	// binary successfully replaced
 	if !mp.Config.NoRestartAfterFetch {
 		mp.triggerRestart()
 	}
-	//and keep fetching...
+	// and keep fetching...
 	return
 }
 
 func (mp *master) triggerRestart() {
 	if mp.restarting {
 		mp.debugf("already graceful restarting")
-		return //skip
+		return // skip
 	} else if mp.slaveCmd == nil || mp.restarting {
 		mp.debugf("no slave process")
-		return //skip
+		return // skip
 	}
 	mp.debugf("graceful restart triggered")
 	mp.restarting = true
 	mp.awaitingUSR1 = true
 	mp.signalledAt = time.Now()
-	mp.sendSignal(mp.Config.RestartSignal) //ask nicely to terminate
+	mp.sendSignal(mp.Config.RestartSignal) // ask nicely to terminate
 	select {
 	case <-mp.restarted:
-		//success
+		// success
 		mp.debugf("restart success")
 	case <-time.After(mp.TerminateTimeout):
-		//times up mr. process, we did ask nicely!
+		// times up mr. process, we did ask nicely!
 		mp.debugf("graceful timeout, forcing exit")
 		mp.sendSignal(os.Kill)
 	}
 }
 
-//not a real fork
+// not a real fork
 func (mp *master) forkLoop() error {
-	//loop, restart command
+	// loop, restart command
 	for {
 		if err := mp.fork(); err != nil {
 			return err
@@ -344,11 +344,11 @@ func (mp *master) forkLoop() error {
 func (mp *master) fork() error {
 	mp.debugf("starting %s", mp.binPath)
 	cmd := exec.Command(mp.binPath)
-	//mark this new process as the "active" slave process.
-	//this process is assumed to be holding the socket files.
+	// mark this new process as the "active" slave process.
+	// this process is assumed to be holding the socket files.
 	mp.slaveCmd = cmd
 	mp.slaveID++
-	//provide the slave process with some state
+	// provide the slave process with some state
 	e := os.Environ()
 	e = append(e, envBinID+"="+hex.EncodeToString(mp.binHash))
 	e = append(e, envBinPath+"="+mp.binPath)
@@ -356,32 +356,32 @@ func (mp *master) fork() error {
 	e = append(e, envIsSlave+"=1")
 	e = append(e, envNumFDs+"="+strconv.Itoa(len(mp.slaveExtraFiles)))
 	cmd.Env = e
-	//inherit master args/stdfiles
+	// inherit master args/stdfiles
 	cmd.Args = os.Args
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	//include socket files
+	// include socket files
 	cmd.ExtraFiles = mp.slaveExtraFiles
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("Failed to start slave process: %s", err)
 	}
-	//was scheduled to restart, notify success
+	// was scheduled to restart, notify success
 	if mp.restarting {
 		mp.restartedAt = time.Now()
 		mp.restarting = false
 		mp.restarted <- true
 	}
-	//convert wait into channel
+	// convert wait into channel
 	cmdwait := make(chan error)
 	go func() {
 		cmdwait <- cmd.Wait()
 	}()
-	//wait....
+	// wait....
 	select {
 	case err := <-cmdwait:
-		//program exited before releasing descriptors
-		//proxy exit code out to master
+		// program exited before releasing descriptors
+		// proxy exit code out to master
 		code := 0
 		if err != nil {
 			code = 1
@@ -392,20 +392,20 @@ func (mp *master) fork() error {
 			}
 		}
 		mp.debugf("prog exited with %d", code)
-		//if a restarts are disabled or if it was an
-		//unexpected crash, proxy this exit straight
-		//through to the main process
+		// if a restarts are disabled or if it was an
+		// unexpected crash, proxy this exit straight
+		// through to the main process
 		if mp.NoRestart || !mp.restarting {
 			os.Exit(code)
 		}
 	case <-mp.descriptorsReleased:
-		//if descriptors are released, the program
-		//has yielded control of its sockets and
-		//a parallel instance of the program can be
-		//started safely. it should serve state.Listeners
-		//to ensure downtime is kept at <1sec. The previous
-		//cmd.Wait() will still be consumed though the
-		//result will be discarded.
+		// if descriptors are released, the program
+		// has yielded control of its sockets and
+		// a parallel instance of the program can be
+		// started safely. it should serve state.Listeners
+		// to ensure downtime is kept at <1sec. The previous
+		// cmd.Wait() will still be consumed though the
+		// result will be discarded.
 	}
 	return nil
 }
