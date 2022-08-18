@@ -288,10 +288,10 @@ func (mp *master) fetch() {
 		mp.warnf("failed to run temp binary: %s (%s) output \"%s\"", err, tmpBinPath, tokenOut)
 		return
 	}
-	// if tokenIn != string(tokenOut) {
-	// 	mp.warnf("sanity check failed")
-	// 	return
-	// }
+	if tokenIn != string(tokenOut) {
+		mp.warnf("sanity check failed")
+		return
+	}
 	// overwrite!
 	if err := overwrite(mp.binPath, tmpBinPath); err != nil {
 		mp.warnf("failed to overwrite binary: %s", err)
