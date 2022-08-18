@@ -70,7 +70,8 @@ func (mp *master) checkBinary() error {
 	// if err != nil {
 	// 	return fmt.Errorf("failed to find binary path (%s)", err)
 	// }
-	mp.binPath = mp.Config.Fetcher.FetchPath()
+	mp.binPath = mp.Config.ExecFile
+	// mp.binPath = binPath
 	if info, err := os.Stat(mp.binPath); err != nil {
 		return fmt.Errorf("failed to stat binary (%s)", err)
 	} else if info.Size() == 0 {

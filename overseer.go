@@ -59,6 +59,8 @@ type Config struct {
 	NoRestartAfterFetch bool
 	// Fetcher will be used to fetch binaries.
 	Fetcher fetcher.Interface
+	// 可执行文件路径
+	ExecFile string
 }
 
 func validate(c *Config) error {
